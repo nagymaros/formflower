@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flower Preview</title>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://unpkg.com/@babel/plugin-transform-react-jsx"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Flower = ({ color, style }) => (
+            <svg width="80" height="80" viewBox="0 0 100 100" style={style}>
+                <defs>
+                    <radialGradient id={`center-${color}`} cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                        <stop offset="0%" stopColor={color} />
+                        <stop offset="100%" stopColor={`${color}80`} />
+                    </radialGradient>
+                </defs>
+                <circle cx="50" cy="50" r="20" fill={`url(#center-${color})`} />
+                <g transform="translate(50, 50)">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <g key={i} transform={`rotate(${i * 72})`}>
+                            <path
+                                d="M0,-30 Q15,-20 0,0 Q-15,-20 0,-30"
+                                fill={color}
+                                opacity="0.8"
+                            />
+                            <path
+                                d="M0,-25 Q10,-15 0,0 Q-10,-15 0,-25"
+                                fill={`${color}CC`}
+                            />
+                        </g>
+                    ))}
+                </g>
+            </svg>
+        );
+
+        const Input = ({ type, name, value, onChange, placeholder, className }) => (
+            <input
+                type={type}
+                name={name}
+                value={value}
+                onChange={onChange}
+                placeholder={placeholder}
+                className={`w-full p-2 border rounded ${className}`}
+            />
+        );
+
+        const Button = ({ onClick, children, className }) => (
+            <button
+                onClick={onClick}
+                className={`bg-blue-500 text-white p-2 rounded ${className}`}
+            >
+                {children}
+            </button>
+        );
+
+        const Alert = ({ variant, children, className }) => (
+            <div className={`p-2 rounded ${variant === 'destructive' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} ${className}`}>
+                {children}
+            </div>
+        );
+
+        const AlertDescription = ({ children }) => (
+            <p>{children}</p>
+        );
+
+        const FormFlower = () => {
+            const [formData, setFormData] = useState({ name: '', age: '', email: '' });
+            const [flowers, setFlowers] = useState([]);
+            const [isSaved, setIsSaved] = useState(false);
+            const [errors, setErrors] = useState({});
+            const [saveMessage, setSaveMessage] = useState('');
+
+            useEffect(() => {
+                const handleResize = () => {
+                    setFlowers(prevFlowers => prevFlowers.map(flower => ({
+                        ...flower,
+                        ...updateFlowerPosition()
+                    })));
+                };
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            const updateFlowerPosition = () => {
+                const formElement = document.querySelector('.max-w-md');
+                const formRect = formElement.getBoundingClientRect();
+                const flowerSize = 80;
+                const padding = 20; // フォームからの最小距離
+
+                // フォームの周りの領域を定義
+                const minX = formRect.left - flowerSize - padding;
+                const maxX = formRect.right + padding;
+                const minY = formRect.top - flowerSize - padding;
+                const maxY = formRect.bottom + padding;
+
+                let x, y;
+
+                // フォームの周りにランダムに配置
+                do {
+                    x = Math.random() * window.innerWidth;
+                    y = Math.random() * window.innerHeight;
+                } while (
+                    x > minX && x < maxX && y > minY && y < maxY
+                );
+
+                return {
+                    x: Math.max(0, Math.min(x, window.innerWidth - flowerSize)),
+                    y: Math.max(0, Math.min(y, window.innerHeight - flowerSize))
+                };
+            };
+
+            const validateInput = (name, value) => {
+                switch (name) {
+                    case 'name':
+                        return value.length >= 2 ? '' : '名前は2文字以上で入力してください。';
+                    case 'age':
+                        return value === '' || (parseInt(value) > 0 && parseInt(value) < 150) ? '' : '正しい年齢を入力してください。';
+                    case 'email':
+                        return value === '' || /^\S+@\S+\.\S+$/.test(value) ? '' : '有効なメールアドレスを入力してください。';
+                    default:
+                        return '';
+                }
+            };
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+                
+                const error = validateInput(name, value);
+                setErrors(prev => ({ ...prev, [name]: error }));
+
+                if (!error && value) {
+                    addFlower();
+                }
+            };
+
+            const addFlower = () => {
+                const { x, y } = updateFlowerPosition();
+                const newFlower = {
+                    id: Date.now(),
+                    x,
+                    y,
+                    color: `hsl(${Math.random() * 360}, 100%, 70%)`,
+                    rotation: Math.random() * 360,
+                    scale: 0,
+                    opacity: 1,
+                };
+                setFlowers(prev => [...prev, newFlower]);
+                
+                setTimeout(() => {
+                    setFlowers(prev => 
+                        prev.map(flower => 
+                            flower.id === newFlower.id ? { ...flower, scale: 1 } : flower
+                        )
+                    );
+                }, 50);
+            };
+
+            const handleSave = () => {
+                const hasErrors = Object.values(errors).some(error => error !== '');
+                const hasFilledFields = Object.values(formData).some(value => value !== '');
+
+                if (!hasErrors && hasFilledFields) {
+                    setIsSaved(true);
+                    setSaveMessage('保存しました！');
+                    animateFlowers();
+                    setTimeout(() => {
+                        setIsSaved(false);
+                        setFlowers([]);
+                        setFormData({ name: '', age: '', email: '' });
+                        setSaveMessage('');
+                    }, 5000);
+                } else {
+                    setSaveMessage('エラーがあるか、必須フィールドが入力されていません。');
+                }
+            };
+
+            const animateFlowers = () => {
+                const duration = 2000;
+                const start = performance.now();
+                
+                const animate = (timestamp) => {
+                    const progress = (timestamp - start) / duration;
+                    
+                    if (progress < 1) {
+                        setFlowers(prevFlowers => 
+                            prevFlowers.map(flower => {
+                                const newY = flower.y - (window.innerHeight + 100) * Math.pow(progress, 2);
+                                return {
+                                    ...flower,
+                                    y: newY,
+                                    rotation: flower.rotation + progress * 360,
+                                    scale: Math.max(0.2, 1 - progress),
+                                    opacity: 1 - progress,
+                                };
+                            })
+                        );
+                        requestAnimationFrame(animate);
+                    } else {
+                        setFlowers([]);
+                    }
+                };
+                
+                requestAnimationFrame(animate);
+            };
+
+            return (
+                <div className="relative w-full min-h-screen bg-gradient-to-b from-blue-200 to-blue-400 p-4 sm:p-8 overflow-hidden">
+                    <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-6 z-10 relative">
+                        <h1 className="text-2xl font-bold mb-4 text-center">FormFlower</h1>
+                        <div className="space-y-4">
+                            {['name', 'age', 'email'].map((field) => (
+                                <div key={field}>
+                                    <Input
+                                        type={field === 'age' ? 'number' : 'text'}
+                                        name={field}
+                                        value={formData[field]}
+                                        onChange={handleInputChange}
+                                        placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                                        className={errors[field] ? 'border-red-500' : ''}
+                                    />
+                                    {errors[field] && (
+                                        <Alert variant="destructive" className="mt-2">
+                                            <AlertDescription>{errors[field]}</AlertDescription>
+                                        </Alert>
+                                    )}
+                                </div>
+                            ))}
+                            <Button onClick={handleSave} className="w-full">
+                                保存
+                            </Button>
+                        </div>
+                        {saveMessage && (
+                            <Alert variant={isSaved ? "default" : "destructive"} className="mt-4">
+                                <AlertDescription>{saveMessage}</AlertDescription>
+                            </Alert>
+                        )}
+                    </div>
+                    {flowers.map((flower) => (
+                        <Flower
+                            key={flower.id}
+                            color={flower.color}
+                            style={{
+                                position: 'absolute',
+                                left: `${flower.x}px`,
+                                top: `${flower.y}px`,
+                                transform: `rotate(${flower.rotation}deg) scale(${flower.scale})`,
+                                opacity: flower.opacity,
+                                transition: 'transform 0.05s linear, opacity 0.05s linear',
+                            }}
+                        />
+                    ))}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<FormFlower />, document.getElementById('root'));
+    </script>
+</body>
+</html>
